@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">ChatApp</string>
+    <string name="NamePlaceHolder">Name</string>
+    <string name="MessagePlaceHolder">Message</string>
+    <string name="ButtonSend">Send</string>
+    <string name="databaseRoot">messages</string>
+    <string name="turn_off_chat">Turn Off chat</string>
+</resources>
