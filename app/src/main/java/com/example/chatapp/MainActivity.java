@@ -10,6 +10,8 @@ import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Scroller;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -33,8 +35,10 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout mainLayout;
     private Set<String> currMessages;
     private Switch powerSwitch;
-    ValueEventListener databaseMessagesListener;
-    ValueEventListener databasePowerListener;
+    private ScrollView scrollView;
+    private ValueEventListener databaseMessagesListener;
+    private ValueEventListener databasePowerListener;
+    private Boolean turnedOff;
     // TODO: add messages view list
     // TODO: add power button to chat
 
@@ -48,6 +52,8 @@ public class MainActivity extends AppCompatActivity {
         errorHandler = (TextView) findViewById(R.id.errorHandler);
         mainLayout = (LinearLayout) findViewById(R.id.mainLayout);
         powerSwitch = findViewById(R.id.chatPower);
+        scrollView = (ScrollView)findViewById(R.id.ScrollView);
+        turnedOff = false;
 
         addDatabasePowerListener();
         addSwitchListener();
@@ -62,12 +68,15 @@ public class MainActivity extends AppCompatActivity {
                     sendButton.setEnabled(true);
                     addButtonListener();
                     databaseRef.child("power").setValue(true);
-                    databaseRef.child(getString(R.string.databaseRoot)).removeValue();
+                    if (turnedOff){
+                        databaseRef.child(getString(R.string.databaseRoot)).removeValue();
+                    }
                 } else {
                     removeDataBaseMessagesListener();
                     sendButton.setEnabled(false);
                     removeButtonListener();
                     databaseRef.child("power").setValue(false);
+                    turnedOff = true;
                 }
             }
         });
@@ -78,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
         databaseMessagesListener = databaseRef.child(getString(R.string.databaseRoot)).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Log.d("onDataChange", "start");
                 messages = new Messages(dataSnapshot.getChildren());
                 for (Map.Entry<String, Message> entry : messages.getMessages().entrySet()) {
                     if (!currMessages.contains(entry.getKey())) {
@@ -94,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 for (String id : removedMessages) {
-                    mainLayout.removeView(findViewById(Integer.parseInt(id)));
+                    mainLayout.removeView(mainLayout.findViewWithTag(id));
                 }
                 // TODO: delete and move to view
                 Log.d("messages", messages.toString());
@@ -133,19 +143,25 @@ public class MainActivity extends AppCompatActivity {
         View messagesView = getLayoutInflater().inflate(R.layout.message, null);
 
         TextView sender = (TextView) messagesView.findViewById(R.id.sender);
-        sender.setText(msg.getName());
+        sender.setText(msg.getSenderName());
         TextView messageText = (TextView) messagesView.findViewById(R.id.messageText);
-        messageText.setText(msg.getMessage());
+        messageText.setText(msg.getContent());
         TextView time = (TextView) messagesView.findViewById(R.id.time);
         time.setText(msg.getTime().toString());
         TextView osType = (TextView) messagesView.findViewById(R.id.osType);
-        osType.setText(msg.getOsType().toString());
-        messagesView.setId(Integer.parseInt(id));
+        osType.setText(msg.getSenderOSType().toString());
+        messagesView.setTag(id);
 
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(mainLayout.getLayoutParams());
         layoutParams.setMargins(0, 0, 0, 5);
 
         mainLayout.addView(messagesView, layoutParams);
+        scrollView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                scrollView.fullScroll(View.FOCUS_DOWN);
+            }
+        }, 200);
     }
 
     public void addButtonListener() {
@@ -155,22 +171,24 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 final String name = ((EditText) findViewById(R.id.editTextName)).getText().toString();
-                final String message = ((EditText) findViewById(R.id.editTextMessage)).getText().toString();
+                final String messageContent = ((EditText) findViewById(R.id.editTextMessage)).getText().toString();
                 if (name.isEmpty()) {
                     errorHandler.setText("Name filed is empty");
                     return;
                 }
-                if (message.isEmpty()) {
+                if (messageContent.isEmpty()) {
                     errorHandler.setText("Message filed is empty");
                     return;
                 }
                 int msgId = ThreadLocalRandom.current().nextInt(0, Integer.MAX_VALUE);
-                databaseRef.child(getString(R.string.databaseRoot)).child(Integer.toString(msgId)).setValue(new Message(name, message));
+                Message message = new Message(name, messageContent);
+                String messageID = databaseRef.child(getString(R.string.databaseRoot)).push().getKey();
+                databaseRef.child(getString(R.string.databaseRoot)).child(messageID).setValue(message.toDict());
                 databaseRef.push();
 
                 // TODO: delete
                 Log.d("name", name);
-                Log.d("message", message);
+                Log.d("message", messageContent);
                 Log.d("id", UUID.randomUUID().toString());
             }
         });
